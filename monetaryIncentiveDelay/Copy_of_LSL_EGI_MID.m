@@ -13,6 +13,10 @@ classdef LSL_EGI_MID < LSL_data
         trial_sequence
         trial_types
         target_flash_time
+        buttonThreshold
+        buttonPressed
+        buttonPressTime
+        logFileName
     end
     
     methods (Access = public)
@@ -24,6 +28,9 @@ classdef LSL_EGI_MID < LSL_data
             self.trial_n = trial_n;
             self.current_block = 1;
             self.current_trial = 1;
+            self.buttonPressed = false;
+            self.buttonThreshold = 3.0;
+            self.buttonPressTime = 0;
 
             %% State settings (values in number of calls, since time_keeper is called every 0.1s)
             self.state.ready = 1;      % Ready period (1000 ms)
@@ -53,11 +60,19 @@ classdef LSL_EGI_MID < LSL_data
             self.daq.ID = 'Dev2';
             self.daq.NS = DAQclass(self.daq.ID);
             self.daq.NS = self.daq.NS.init_output;
+            self.daq.NS = self.daq.NS.init_input;
             
             %% UDP settings
             self.udpR = ReceiverUDP();
             self.udpR.set_config(5500, "127.0.0.5", 0.05);
             self.udpR.start();
+
+            self.logFileName = ['experiment_log_' char(datetime('now', 'Format', 'yyyyMMdd_HHmmss')) '.txt'];
+            diary(self.logFileName);
+            diary on;
+            disp(['Logging started at ' char(datetime('now', 'Format', 'HH:mm:ss'))]);
+
+
         end           
 
         function self = setup_protocol(self)
@@ -105,6 +120,16 @@ classdef LSL_EGI_MID < LSL_data
             end
         end
 
+        function buttonPressed = monitorButtonPress(self)
+            % Reads button input and returns true if pressed
+            buttonVoltage = self.daq.NS.read_ai3_voltage();
+            if buttonVoltage > self.buttonThreshold
+                buttonPressed = true;
+            else
+                buttonPressed = false;
+            end
+        end
+
         function self = show_protocol(self)
             self.fig.trial_num.String = sprintf('Trial %d', self.current_trial);
             trial_type = self.trial_types(self.current_trial);
@@ -144,6 +169,9 @@ classdef LSL_EGI_MID < LSL_data
             elseif self.data.count > self.state.target && self.data.count < self.state.feedback
                 % Random flash within the 300 ms target window
                 flash_time = self.target_flash_time(self.current_trial);
+                disp('Start monitoring button press');
+                self.buttonPressed = self.monitorButtonPress();
+                disp(self.buttonPressed);
                 if self.data.count == self.state.target + 1 + round(flash_time)
                     if trial_type == 1
                         self.fig.str.String = '■';
@@ -155,6 +183,11 @@ classdef LSL_EGI_MID < LSL_data
                         self.fig.str.String = '■';
                         self.fig.str.Color = 'red';
                     end
+                elseif self.buttonPressed
+                    self.buttonPressTime = self.data.count;
+                elseif self.buttonPressTime > 0 && (self.data.count - self.buttonPressTime) <= 10
+                    self.fig.str.String = '●';
+                    self.fig.str.Color = 'white';
                 else
                     self.fig.str.String = '';
                 end

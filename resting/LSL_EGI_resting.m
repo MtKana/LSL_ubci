@@ -22,19 +22,19 @@ classdef LSL_EGI_resting < LSL_data
             self.state.udp     = 0;  % 0:no udp, 1:read udp
             self.state.trigger = 0;  % 1(key 'q' pressed, exp. begin)
             
-            self.state.relax   = 0;      % relax (5 sec)
-            self.state.close_1 = 5;    % close (60 sec)
-            self.state.open_1  = 65;   % open  (60 sec)
-            self.state.close_2 = 125;  % close (60 sec)
-            self.state.open_2  = 185;  % open  (60 sec)
-            self.state.end     = 245;  % end of one loop
-
 %             self.state.relax   = 0;      % relax (5 sec)
 %             self.state.close_1 = 5;    % close (60 sec)
-%             self.state.open_1  = 10;   % open  (60 sec)
-%             self.state.close_2 = 15;  % close (60 sec)
-%             self.state.open_2  = 20;  % open  (60 sec)
-%             self.state.end     = 25;  % end of one loop
+%             self.state.open_1  = 65;   % open  (60 sec)
+%             self.state.close_2 = 125;  % close (60 sec)
+%             self.state.open_2  = 185;  % open  (60 sec)
+%             self.state.end     = 245;  % end of one loop
+
+            self.state.relax   = 0;      % relax (5 sec)
+            self.state.close_1 = 5;    % close (5 sec)
+            self.state.open_1  = 10;   % open  (5 sec)
+            self.state.close_2 = 15;  % close (5 sec)
+            self.state.open_2  = 20;  % open  (5 sec)
+            self.state.end     = 25;  % end of one loop
             
             %% Data tracking
             self.data.sample = 10;  % 10 samples/sec (buffering duration : 0.1)
@@ -57,16 +57,12 @@ classdef LSL_EGI_resting < LSL_data
             self.udpR.start();
         end           
         
-        %% Setup figure (protocol)
         function self = setup_protocol(self)
-            self.fp = figure;
-            self.fp.Position = self.fig.initial_pos;
-            set(self.fp, 'color', 'none', 'menu', 'none', 'toolbar', 'none');
-            self.fig.str = text(2, 1, 'Please wait...', 'fontsize', 50, 'fontname', 'Arial', 'color', 'white', 'HorizontalAlignment', 'center');
-            axis tight;            
+            self.fp = figure('Units', 'pixels', 'Position', get(0, 'ScreenSize'), 'WindowState', 'maximized'); % Fullscreen
+            set(self.fp, 'color', 'black', 'menu', 'none', 'toolbar', 'none');
+            hold on;
+            self.fig.str = text(0.5, 0.5, 'Please wait...', 'fontsize', 100, 'fontname', 'Arial', 'color', 'white', 'HorizontalAlignment', 'center', 'Units', 'normalized');
             axis off;
-            xlim([0 4]); 
-            ylim([0 2]);
         end
         
         %% Time keeper
@@ -86,6 +82,7 @@ classdef LSL_EGI_resting < LSL_data
                         self.current_repeat = self.current_repeat + 1;
                         self.data.time = 0;
                     else
+                        self.current_repeat = self.current_repeat + 1;
                         self.state.trigger = 0; % Stop experiment after repeat_n loops
                     end
                 end
@@ -116,7 +113,6 @@ classdef LSL_EGI_resting < LSL_data
             dbstop if error;
             if self.data.time == self.state.relax && self.data.count == 1  % Relax
                 self.daq.NS.sendCommand(1);
-                self.fp.Position    = self.fig.original_pos;
                 self.fig.str.Color  = 'white';
                 self.fig.str.String = sprintf('Loop %d/%d', self.current_repeat, self.repeat_n);
                 beep;
@@ -148,15 +144,13 @@ classdef LSL_EGI_resting < LSL_data
             elseif self.data.time == self.state.end && self.data.count == 1  % End of loop
                 if self.current_repeat < self.repeat_n
                     self.daq.NS.sendCommand(1);
-                    self.fig.str.Color  = 'blue';
-                    self.fig.str.String = 'Close';
+                    self.fig.str.String = '';
                 else
                     self.fig.str.Color  = 'blue';
                     self.fig.str.String = 'END';
                     if self.current_repeat == self.repeat_n
                         self.daq.NS.sendCommand(1);
                         beep;
-                        self.current_repeat = self.current_repeat + 1;
                     end
                 end
             end

@@ -9,7 +9,7 @@ sec = 2;
 COI = 1:128;
 
 %% initialize EGI
-LE = LSL_EGI_MID(Fs,sec,COI, 3, 4);
+LE = LSL_EGI_MID(Fs,sec,COI, 3, 6);
 LE = LE.set_buffer;
 
 user_data.LSL_EGI_MID = LE;

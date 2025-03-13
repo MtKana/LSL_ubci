@@ -1,4 +1,4 @@
-classdef LSL_EGI_MID < LSL_data
+classdef LSL_DAQ_goNoGo < LSL_data
     properties (Access = public)
         state  = struct;
         data   = struct;
@@ -10,13 +10,15 @@ classdef LSL_EGI_MID < LSL_data
         trial_n
         current_block
         current_trial
+        go_ratio
         trial_sequence
-        trial_types
-        target_flash_time
+        data_daq
+        feedback_type % Stores feedback type
+        detected_response % Flag to track if data_daq > 2 detected during response window
     end
     
     methods (Access = public)
-        function self = LSL_EGI_MID(Fs, sec, COI, block_n, trial_n)
+        function self = LSL_DAQ_goNoGo(Fs, sec, COI, block_n, trial_n, go_ratio)
             self@LSL_data(Fs, sec, COI);
             
             %% Set parameters
@@ -24,36 +26,39 @@ classdef LSL_EGI_MID < LSL_data
             self.trial_n = trial_n;
             self.current_block = 1;
             self.current_trial = 1;
+            self.go_ratio = go_ratio;
+            self.data_daq = [];
+            self.feedback_type = []; % Initialize feedback type
+            self.detected_response = false; % Flag for DAQ > 2 detection
 
-            %% State settings (values in number of calls, since time_keeper is called every 0.1s)
-            self.state.ready = 1;      % Ready period (1000 ms)
-            self.state.cue = 11;       % Cue presentation (1000 ms)
-            self.state.fixation = 21;  % Fixation cross (500 ms)
-            self.state.target = 26;    % Target stimulus (3000 ms)
-            self.state.blank = 56;     % Blank period (2000ms)
-            self.state.feedback = 76;  % Feedback period (2000 ms)
-            self.state.end = 96;
-            self.data.count = 0;
-            self.data.running = 0;
+            %% State settings
             self.state.udp     = 0;
             self.state.trigger = 0;
+            self.state.ready   = 1;   
+            self.state.fixation = 11; 
+            self.state.stimulus = 18; 
+            self.state.response = 20; 
+            self.state.feedback = 32; 
+            self.state.end = 52;
+            self.data.count = 0;
+            self.data.running = 0;
 
-            %% Generate balanced trial types (1: Reward, 2: Neutral, 3: Loss)
-            n_each = floor(trial_n / 3);
-            self.trial_types = [ones(1, n_each), 2*ones(1, n_each), 3*ones(1, n_each)];
-            self.trial_types = self.trial_types(randperm(length(self.trial_types))); % Shuffle trials            
-            
-            %% Generate randomized target flash times (between 0 and 3000 ms)
-            self.target_flash_time = randi([0 2900], 1, trial_n) / 100; % Convert to 10 seconds unit
-            
+            %% Generate randomized trial sequence
+            total_go = round(go_ratio * trial_n);
+            total_nogo = trial_n - total_go;
+            self.trial_sequence = [ones(1, total_go), zeros(1, total_nogo)];
+            self.trial_sequence = self.trial_sequence(randperm(length(self.trial_sequence)));
+
             %% Figure settings
             self.fig.str = 0;
-            
+            self.fig.initial_pos  = [500 350 600 200];
+            self.fig.original_pos = [650 400 300 100];
+
             %% DAQ settings
             self.daq.ID = 'Dev2';
             self.daq.NS = DAQclass(self.daq.ID);
             self.daq.NS = self.daq.NS.init_output;
-            
+
             %% UDP settings
             self.udpR = ReceiverUDP();
             self.udpR.set_config(5500, "127.0.0.5", 0.05);
@@ -61,7 +66,7 @@ classdef LSL_EGI_MID < LSL_data
         end           
 
         function self = setup_protocol(self)
-            self.fp = figure('Units', 'pixels', 'Position', get(0, 'ScreenSize'), 'WindowState', 'maximized'); % Fullscreen
+            self.fp = figure('Units', 'pixels', 'Position', get(0, 'ScreenSize'), 'WindowState', 'maximized');
             set(self.fp, 'color', 'black', 'menu', 'none', 'toolbar', 'none');
             hold on;
             self.fig.trial_num = text(0.02, 0.98, '', 'fontsize', 50, 'fontname', 'Arial', 'color', 'white', 'HorizontalAlignment', 'left', 'Units', 'normalized');
@@ -105,10 +110,29 @@ classdef LSL_EGI_MID < LSL_data
             end
         end
 
+        function self = process_daq(self, daq_data)
+            dbstop if error;
+            self.data_daq = daq_data; 
+            value = self.data_daq(1, 4); % Extract value
+            self.fig.trial_num.String = sprintf('Block: %d | Trial: %d | DAQ: %.2f', ...
+                self.current_block, self.current_trial, value);
+            drawnow;
+            
+            % Monitor DAQ data during response window
+            if self.data.count >= self.state.response && self.data.count < self.state.feedback
+                if any(self.data_daq(:, 4) > 2)
+                    self.detected_response = true; % Mark response detected
+                end
+            end
+        end
+
         function self = show_protocol(self)
-            self.fig.trial_num.String = sprintf('Trial %d', self.current_trial);
-            trial_type = self.trial_types(self.current_trial);
+            dbstop if error;
             if self.data.count == 0
+                % Reset feedback type and response detection flag at the start of each trial
+                self.feedback_type = [];
+                self.detected_response = false;
+
                 if self.current_trial >= self.trial_n && self.current_block > self.block_n
                     self.fig.str.String = 'Experiment end';
                     self.fig.str.Color = 'white';
@@ -119,62 +143,57 @@ classdef LSL_EGI_MID < LSL_data
             elseif self.data.count == self.state.ready
                 self.daq.NS.sendCommand(1);
                 beep;
-                disp('ready period start');
-                self.fig.str.String = 'Get ready';
+                self.fig.str.String = 'Ready';
                 self.fig.str.Color = 'white';
-            elseif self.data.count == self.state.cue
-                self.daq.NS.sendCommand(1);
-                if trial_type == 1
-                    self.fig.str.String = '●'; % Reward cue (Green Circle)
-                    self.fig.str.Color = 'yellow';
-                elseif trial_type == 2
-                    self.fig.str.String = '●'; % Neutral cue (Gray Circle)
-                    self.fig.str.Color = 'blue';
-                else
-                    self.fig.str.String = '●'; % Loss cue (Red Circle)
-                    self.fig.str.Color = 'red';
-                end
             elseif self.data.count == self.state.fixation
                 self.daq.NS.sendCommand(1);
                 self.fig.str.String = '+';
                 self.fig.str.Color = 'white';
-            elseif self.data.count == self.state.target
-                self.daq.NS.sendCommand(1);
-                self.fig.str.String = '';
-            elseif self.data.count > self.state.target && self.data.count < self.state.feedback
-                % Random flash within the 300 ms target window
-                flash_time = self.target_flash_time(self.current_trial);
-                if self.data.count == self.state.target + 1 + round(flash_time)
+            elseif self.data.count == self.state.stimulus
+                if self.current_trial <= self.trial_n
+                    trial_type = self.trial_sequence(self.current_trial);
                     if trial_type == 1
-                        self.fig.str.String = '■';
-                        self.fig.str.Color = 'yellow';
-                    elseif trial_type == 2
-                        self.fig.str.String = '■';
-                        self.fig.str.Color = 'blue';
+                        self.daq.NS.sendCommand(2); % DAQ command for Go trial
+                        self.fig.str.String = 'Go';
+                        self.fig.str.Color = 'green';
                     else
-                        self.fig.str.String = '■';
+                        self.daq.NS.sendCommand(3); % DAQ command for No-Go trial
+                        self.fig.str.String = 'No-go';
                         self.fig.str.Color = 'red';
                     end
-                else
-                    self.fig.str.String = '';
                 end
-            elseif self.data.count == self.state.blank
-                self.buttonPressed = false;
-                self.daq.NS.sendCommand(1);
-                self.fig.str.String = '';
+            elseif self.data.count == self.state.response
+                self.fig.str.String = 'Respond';
+                self.fig.str.Color = 'white';
             elseif self.data.count == self.state.feedback
-                if trial_type == 1
-                    self.fig.str.String = 'You won $1!';
-                    self.fig.str.Color = 'yellow';
-                elseif trial_type == 2
-                    self.fig.str.String = 'No reward nor loss';
-                    self.fig.str.Color = 'blue';
+                % Determine feedback at the end of response window
+                trial_type = self.trial_sequence(self.current_trial);
+
+                if self.detected_response
+                    if trial_type == 1
+                        self.feedback_type = 1; % Positive for Go trial
+                    else
+                        self.feedback_type = 0; % Negative for No-Go trial
+                    end
                 else
-                    self.fig.str.String = 'You avoided losing $1!';
-                    self.fig.str.Color = 'red';
+                    if trial_type == 1
+                        self.feedback_type = 0; % Negative for Go trial
+                    else
+                        self.feedback_type = 1; % Positive for No-Go trial
+                    end
+                end
+
+                % Show feedback
+                if self.feedback_type == 1
+                    self.fig.str.String = 'Well done';
+                    self.fig.str.Color = 'white';
+                    self.daq.NS.sendCommand(4); % DAQ command for positive feedback
+                else
+                    self.fig.str.String = 'Wrong';
+                    self.fig.str.Color = 'white';
+                    self.daq.NS.sendCommand(1);
                 end
             elseif self.data.count == self.state.end
-                self.daq.NS.sendCommand(1);
                 self.fig.str.String = '';
             end
         end

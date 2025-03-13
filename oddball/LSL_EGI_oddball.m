@@ -1,4 +1,4 @@
-classdef LSL_EGI_MID < LSL_data
+classdef LSL_EGI_oddball < LSL_data
     properties (Access = public)
         state  = struct;
         data   = struct;
@@ -12,11 +12,10 @@ classdef LSL_EGI_MID < LSL_data
         current_trial
         trial_sequence
         trial_types
-        target_flash_time
     end
     
     methods (Access = public)
-        function self = LSL_EGI_MID(Fs, sec, COI, block_n, trial_n)
+        function self = LSL_EGI_oddball(Fs, sec, COI, block_n, trial_n)
             self@LSL_data(Fs, sec, COI);
             
             %% Set parameters
@@ -26,26 +25,25 @@ classdef LSL_EGI_MID < LSL_data
             self.current_trial = 1;
 
             %% State settings (values in number of calls, since time_keeper is called every 0.1s)
-            self.state.ready = 1;      % Ready period (1000 ms)
-            self.state.cue = 11;       % Cue presentation (1000 ms)
-            self.state.fixation = 21;  % Fixation cross (500 ms)
-            self.state.target = 26;    % Target stimulus (3000 ms)
-            self.state.blank = 56;     % Blank period (2000ms)
-            self.state.feedback = 76;  % Feedback period (2000 ms)
-            self.state.end = 96;
+            self.state.ready = 1;      % Ready period (300 ms)
+            self.state.fixation = 4;  % Fixation cross (300 ms)
+            self.state.target = 7;    % Target stimulus (300 ms)
+            self.state.response = 10;  % Response period (1000 ms)
+            self.state.blank = 20;     % Blank period (500 ms)
+            self.state.end = 25;
             self.data.count = 0;
             self.data.running = 0;
             self.state.udp     = 0;
             self.state.trigger = 0;
 
-            %% Generate balanced trial types (1: Reward, 2: Neutral, 3: Loss)
-            n_each = floor(trial_n / 3);
-            self.trial_types = [ones(1, n_each), 2*ones(1, n_each), 3*ones(1, n_each)];
-            self.trial_types = self.trial_types(randperm(length(self.trial_types))); % Shuffle trials            
-            
-            %% Generate randomized target flash times (between 0 and 3000 ms)
-            self.target_flash_time = randi([0 2900], 1, trial_n) / 100; % Convert to 10 seconds unit
-            
+            %% Generate balanced trial types for Oddball Task (Standard ~75%, Target ~20%, Distractor ~5%)
+            n_standard = round(trial_n * 0.75);
+            n_target = round(trial_n * 0.20);
+            n_distractor = trial_n - (n_standard + n_target); % Remaining trials for distractor         
+            self.trial_types = [ones(1, n_standard), 2*ones(1, n_target), 3*ones(1, n_distractor)];
+            self.trial_types = self.trial_types(randperm(length(self.trial_types))); % Shuffle trials
+
+           
             %% Figure settings
             self.fig.str = 0;
             
@@ -58,6 +56,7 @@ classdef LSL_EGI_MID < LSL_data
             self.udpR = ReceiverUDP();
             self.udpR.set_config(5500, "127.0.0.5", 0.05);
             self.udpR.start();
+
         end           
 
         function self = setup_protocol(self)
@@ -74,7 +73,7 @@ classdef LSL_EGI_MID < LSL_data
                 self.data.count = self.data.count + 1;
                 if self.data.count == self.state.end
                     self.data.count = 0;
-                    if self.current_trial < self.trial_n % Prevent exceeding trial count
+                    if self.current_trial < self.trial_n
                         self.current_trial = self.current_trial + 1;
                     else
                         if self.current_block < self.block_n
@@ -99,7 +98,6 @@ classdef LSL_EGI_MID < LSL_data
                         self.data.count = 0;
                         self.current_trial = 1;
                     end
-                    
                     self.udpR.data_recv = [];
                 end
             end
@@ -119,60 +117,30 @@ classdef LSL_EGI_MID < LSL_data
             elseif self.data.count == self.state.ready
                 self.daq.NS.sendCommand(1);
                 beep;
-                disp('ready period start');
                 self.fig.str.String = 'Get ready';
                 self.fig.str.Color = 'white';
-            elseif self.data.count == self.state.cue
-                self.daq.NS.sendCommand(1);
-                if trial_type == 1
-                    self.fig.str.String = '●'; % Reward cue (Green Circle)
-                    self.fig.str.Color = 'yellow';
-                elseif trial_type == 2
-                    self.fig.str.String = '●'; % Neutral cue (Gray Circle)
-                    self.fig.str.Color = 'blue';
-                else
-                    self.fig.str.String = '●'; % Loss cue (Red Circle)
-                    self.fig.str.Color = 'red';
-                end
             elseif self.data.count == self.state.fixation
                 self.daq.NS.sendCommand(1);
                 self.fig.str.String = '+';
                 self.fig.str.Color = 'white';
             elseif self.data.count == self.state.target
                 self.daq.NS.sendCommand(1);
-                self.fig.str.String = '';
-            elseif self.data.count > self.state.target && self.data.count < self.state.feedback
-                % Random flash within the 300 ms target window
-                flash_time = self.target_flash_time(self.current_trial);
-                if self.data.count == self.state.target + 1 + round(flash_time)
-                    if trial_type == 1
-                        self.fig.str.String = '■';
-                        self.fig.str.Color = 'yellow';
-                    elseif trial_type == 2
-                        self.fig.str.String = '■';
-                        self.fig.str.Color = 'blue';
-                    else
-                        self.fig.str.String = '■';
-                        self.fig.str.Color = 'red';
-                    end
-                else
-                    self.fig.str.String = '';
-                end
-            elseif self.data.count == self.state.blank
-                self.buttonPressed = false;
-                self.daq.NS.sendCommand(1);
-                self.fig.str.String = '';
-            elseif self.data.count == self.state.feedback
-                if trial_type == 1
-                    self.fig.str.String = 'You won $1!';
-                    self.fig.str.Color = 'yellow';
-                elseif trial_type == 2
-                    self.fig.str.String = 'No reward nor loss';
+                if trial_type == 1  % Standard (Frequent) Stimulus
+                    self.fig.str.String = 'O'; % Example standard stimulus
                     self.fig.str.Color = 'blue';
-                else
-                    self.fig.str.String = 'You avoided losing $1!';
+                elseif trial_type == 2  % Target (Rare) Stimulus
+                    self.fig.str.String = 'X'; % Example target stimulus
+                    self.fig.str.Color = 'yellow';
+                elseif trial_type == 3  % Distractor Stimulus (if used)
+                    self.fig.str.String = '*'; % Example distractor stimulus
                     self.fig.str.Color = 'red';
                 end
+            elseif self.data.count == self.state.response
+                self.daq.NS.sendCommand(1);
+                self.fig.str.String = '';
+            elseif self.data.count == self.state.blank
+                self.daq.NS.sendCommand(1);
+                self.fig.str.String = '';
             elseif self.data.count == self.state.end
                 self.daq.NS.sendCommand(1);
                 self.fig.str.String = '';
