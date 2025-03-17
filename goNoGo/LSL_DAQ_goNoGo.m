@@ -32,16 +32,16 @@ classdef LSL_DAQ_goNoGo < LSL_data
             self.detected_response = false; % Flag for DAQ > 2 detection
 
             %% State settings
-            self.state.udp     = 0;
-            self.state.trigger = 0;
-            self.state.ready   = 1;   
+            self.state.rest   = 1;   
             self.state.fixation = 11; 
-            self.state.stimulus = 18; 
-            self.state.response = 20; 
-            self.state.feedback = 32; 
-            self.state.end = 52;
+            self.state.stimulus = 21; 
+            self.state.response = 24; 
+            self.state.feedback = 34; 
+            self.state.end = 44;
             self.data.count = 0;
             self.data.running = 0;
+            self.state.udp     = 0;
+            self.state.trigger = 0;
 
             %% Generate randomized trial sequence
             total_go = round(go_ratio * trial_n);
@@ -51,8 +51,6 @@ classdef LSL_DAQ_goNoGo < LSL_data
 
             %% Figure settings
             self.fig.str = 0;
-            self.fig.initial_pos  = [500 350 600 200];
-            self.fig.original_pos = [650 400 300 100];
 
             %% DAQ settings
             self.daq.ID = 'Dev2';
@@ -114,13 +112,12 @@ classdef LSL_DAQ_goNoGo < LSL_data
             dbstop if error;
             self.data_daq = daq_data; 
             value = self.data_daq(1, 4); % Extract value
-            self.fig.trial_num.String = sprintf('Block: %d | Trial: %d | DAQ: %.2f', ...
-                self.current_block, self.current_trial, value);
+            self.fig.trial_num.String = sprintf('Block: %d | Trial: %d | DAQ: %.2f', self.current_block, self.current_trial, value);
             drawnow;
             
             % Monitor DAQ data during response window
             if self.data.count >= self.state.response && self.data.count < self.state.feedback
-                if any(self.data_daq(:, 4) > 2)
+                if any(self.data_daq(:, 4) > 1.5)
                     self.detected_response = true; % Mark response detected
                 end
             end
@@ -137,13 +134,13 @@ classdef LSL_DAQ_goNoGo < LSL_data
                     self.fig.str.String = 'Experiment end';
                     self.fig.str.Color = 'white';
                 elseif self.current_trial == 1 && self.current_block <= self.block_n
-                    self.fig.str.String = 'Please wait...';
+                    self.fig.str.String = 'Please wait';
                     self.fig.str.Color = 'white';
                 end
-            elseif self.data.count == self.state.ready
+            elseif self.data.count == self.state.rest
                 self.daq.NS.sendCommand(1);
                 beep;
-                self.fig.str.String = 'Ready';
+                self.fig.str.String = '';
                 self.fig.str.Color = 'white';
             elseif self.data.count == self.state.fixation
                 self.daq.NS.sendCommand(1);
@@ -154,16 +151,18 @@ classdef LSL_DAQ_goNoGo < LSL_data
                     trial_type = self.trial_sequence(self.current_trial);
                     if trial_type == 1
                         self.daq.NS.sendCommand(2); % DAQ command for Go trial
-                        self.fig.str.String = 'Go';
+                        self.fig.str.String = char(9816);
+                        self.fig.str.FontName = 'Arial Unicode MS';
                         self.fig.str.Color = 'green';
                     else
                         self.daq.NS.sendCommand(3); % DAQ command for No-Go trial
-                        self.fig.str.String = 'No-go';
+                        self.fig.str.String = char(9836);
+                        self.fig.str.FontName = 'Arial Unicode MS';
                         self.fig.str.Color = 'red';
                     end
                 end
             elseif self.data.count == self.state.response
-                self.fig.str.String = 'Respond';
+                self.fig.str.String = '';
                 self.fig.str.Color = 'white';
             elseif self.data.count == self.state.feedback
                 % Determine feedback at the end of response window
@@ -185,11 +184,11 @@ classdef LSL_DAQ_goNoGo < LSL_data
 
                 % Show feedback
                 if self.feedback_type == 1
-                    self.fig.str.String = 'Well done';
+                    self.fig.str.String = 'Well done!';
                     self.fig.str.Color = 'white';
                     self.daq.NS.sendCommand(4); % DAQ command for positive feedback
                 else
-                    self.fig.str.String = 'Wrong';
+                    self.fig.str.String = 'Wrong!';
                     self.fig.str.Color = 'white';
                     self.daq.NS.sendCommand(1);
                 end
