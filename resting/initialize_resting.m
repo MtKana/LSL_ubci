@@ -1,16 +1,16 @@
 %% initialize preprocess for BMI
-cd('C:\Users\UshibaLab\01-individuals\matsuyanagi\resting');
+cd('C:\Users\UshibaLab\01-individuals\matsuyanagi\resting_seri');
 user_data = struct;
 user_data.count = 0;
 
 %% set para
-Fs = 1000;
+Fs = 10000;
 sec = 2;
-COI = 1:128;
+COI = 1:4;
 
-%% initialize EGI
-LE = LSL_EGI_resting(Fs,sec,COI, 2);
-LE = LE.set_buffer;
+%% initialize DAQ
+LD = LSL_DAQ_resting(Fs,sec,COI, 4);
+LD = LD.set_buffer;
 
-user_data.LSL_EGI_resting = LE;
-user_data.LSL_EGI_resting = user_data.LSL_EGI_resting.setup_protocol;
+user_data.LSL_DAQ_resting = LD;
+user_data.LSL_DAQ_resting = user_data.LSL_DAQ_resting.setup_protocol;
