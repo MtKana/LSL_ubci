@@ -1,4 +1,4 @@
-classdef LSL_EGI_stroop < LSL_data
+classdef LSL_DAQ_stroop < LSL_data
     properties (Access = public)
         state  = struct;
         data   = struct;
@@ -15,7 +15,7 @@ classdef LSL_EGI_stroop < LSL_data
     end
     
     methods (Access = public)
-        function self = LSL_EGI_stroop(Fs, sec, COI, block_n, trial_n)
+        function self = LSL_DAQ_stroop(Fs, sec, COI, block_n, trial_n)
             self@LSL_data(Fs, sec, COI);
             
             %% Set parameters

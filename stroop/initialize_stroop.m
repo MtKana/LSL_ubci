@@ -9,8 +9,8 @@ sec = 2;
 COI = 1:128;
 
 %% initialize EGI
-LE = LSL_EGI_stroop(Fs,sec,COI, 3, 10);
-LE = LE.set_buffer;
+LD = LSL_DAQ_stroop(Fs,sec,COI, 3, 10);
+LD = LD.set_buffer;
 
-user_data.LSL_EGI_stroop = LE;
-user_data.LSL_EGI_stroop = user_data.LSL_EGI_stroop.setup_protocol;
+user_data.LSL_DAQ_stroop = LD;
+user_data.LSL_DAQ_stroop = user_data.LSL_DAQ_stroop.setup_protocol;
