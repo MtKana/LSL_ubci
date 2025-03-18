@@ -136,7 +136,6 @@ classdef LSL_DAQ_MID < LSL_data
             response_window_start = self.state.target + 1 + round(flash_time);
             
             if self.data.count == 0
-                self.fig.str.FontSize = 50;
                 self.detected_response = false; % Reset detected response at the start of each trial
                 if self.current_trial >= self.trial_n && self.current_block > self.block_n
                     self.fig.str.String = 'Experiment end';
@@ -155,19 +154,16 @@ classdef LSL_DAQ_MID < LSL_data
                     self.daq.NS.sendCommand(2);
                     self.fig.str.String = char(9816); % Reward cue (Green Circle)
                     self.fig.str.FontName = 'Arial Unicode MS';
-                    self.fig.str.FontSize = 190;
                     self.fig.str.Color = 'yellow';
                 elseif trial_type == 2
                     self.daq.NS.sendCommand(1);
                     self.fig.str.String = char(9731); % Neutral cue (Gray Circle)
                     self.fig.str.FontName = 'Arial Unicode MS';
-                    self.fig.str.FontSize = 190;
                     self.fig.str.Color = 'blue';
                 else
                     self.daq.NS.sendCommand(3);
                     self.fig.str.String = char(9836); % Loss cue (Red Circle)
                     self.fig.str.FontName = 'Arial Unicode MS';
-                    self.fig.str.FontSize = 190;
                     self.fig.str.Color = 'magenta';
                 end
             elseif self.data.count == self.state.fixation
@@ -190,7 +186,6 @@ classdef LSL_DAQ_MID < LSL_data
             elseif self.data.count == response_window_start + 3
                 self.fig.str.String = '';
             elseif self.data.count == self.state.feedback
-                self.fig.str.FontSize = 50;
                 % Feedback based on response
                 if trial_type == 1  % Reward trial
                     if self.detected_response == true
@@ -223,8 +218,7 @@ classdef LSL_DAQ_MID < LSL_data
                         self.fig.str.Color = 'red';
                     end
                 end
-            else self.data.count == self.state.end
-                self.fig.str.FontSize = 50;
+            elseif self.data.count == self.state.end 
                 self.daq.NS.sendCommand(1);
                 self.fig.str.String = '';
             end
