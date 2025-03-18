@@ -12,8 +12,8 @@ function [results, user_data] = postprocess_MID(stream_data_struct_array, user_d
 %         results(1).time_stamps = stream_data_struct_array(1).time_stamps;
 
         %% EGI NetAmp 0 (1)
-        user_data.LSL_DAQ_MID = user_data.LSL_DAQ_MID.process_daq(stream_data_struct_array(1).time_series'); % [samp ch]
         user_data.LSL_DAQ_MID = user_data.LSL_DAQ_MID.time_keeper;
+        user_data.LSL_DAQ_MID = user_data.LSL_DAQ_MID.process_daq(stream_data_struct_array(1).time_series'); % [samp ch]
         user_data.LSL_DAQ_MID = user_data.LSL_DAQ_MID.show_protocol;
     else
         disp('[WARNING] stream_data_struct_array is empty.');
