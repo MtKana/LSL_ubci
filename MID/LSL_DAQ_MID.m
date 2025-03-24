@@ -35,8 +35,8 @@ classdef LSL_DAQ_MID < LSL_data
             self.state.cue = 4;       % Cue presentation (700 ms)
             self.state.fixation = 11;  % Fixation cross (200 ms)
             self.state.target = 13;    % Target stimulus (1000 ms)
-            self.state.feedback = 33;  % Feedback period (500 ms)
-            self.state.end = 38;
+            self.state.feedback = 35;  % Feedback period (500 ms)
+            self.state.end = 40;
             self.data.count = 0;
             self.data.running = 0;
             self.state.udp     = 0;
@@ -70,7 +70,7 @@ classdef LSL_DAQ_MID < LSL_data
             set(self.fp, 'color', 'black', 'menu', 'none', 'toolbar', 'none');
             hold on;
             self.fig.trial_num = text(0.02, 0.98, '', 'fontsize', 50, 'fontname', 'Arial', 'color', 'white', 'HorizontalAlignment', 'left', 'Units', 'normalized');
-            self.fig.str = text(0.5, 0.5, '', 'fontsize', 100, 'fontname', 'Arial', 'color', 'white', 'HorizontalAlignment', 'center', 'Units', 'normalized');
+            self.fig.str = text(0.5, 0.5, '', 'fontsize', 80, 'fontname', 'Arial', 'color', 'white', 'HorizontalAlignment', 'center', 'Units', 'normalized');
             axis off;
         end
 
@@ -114,19 +114,18 @@ classdef LSL_DAQ_MID < LSL_data
         function self = process_daq(self, daq_data)
             dbstop if error;
             self.data_daq = daq_data; 
-            value = self.data_daq(1, 4); % Extract value
-            self.fig.trial_num.String = sprintf('Block: %d | Trial: %d | DAQ: %.2f', self.current_block, self.current_trial, value);
+            self.fig.trial_num.String = sprintf('Block: %d | Trial: %d', self.current_block, self.current_trial);
             drawnow;
-            % Monitor DAQ data ONLY during the 300ms response window
-            flash_time = self.target_flash_time(self.current_trial);
-            response_window_start = self.state.target + 1 + round(flash_time);
-            response_window_end = response_window_start + 3; % 300ms = 3 cycles of 0.1s
-
-            if self.data.count >= response_window_start && self.data.count <= response_window_end
-                if any(self.data_daq(:, 4) > 1.5)
-                    self.detected_response = true; % Mark response detected
-                end
-            end
+%             % Monitor DAQ data ONLY during the 300ms response window
+%             flash_time = self.target_flash_time(self.current_trial);
+%             response_window_start = self.state.target + 1 + round(flash_time);
+%             responsqqe_window_end = response_window_start + 3; % 300ms = 3 cycles of 0.1s
+% 
+%             if self.data.count >= response_window_start && self.data.count <= response_window_end
+%                 if any(self.data_daq(:, 4) > 1)
+%                     self.detected_response = true; % Mark response detected
+%                 end
+%             end
         end
 
         function self = show_protocol(self)
@@ -154,17 +153,17 @@ classdef LSL_DAQ_MID < LSL_data
                     self.daq.NS.sendCommand(2);
                     self.fig.str.String = char(9816); % Reward cue (Green Circle)
                     self.fig.str.FontName = 'Arial Unicode MS';
-                    self.fig.str.Color = 'yellow';
+                    self.fig.str.Color = 'blue';
                 elseif trial_type == 2
                     self.daq.NS.sendCommand(1);
                     self.fig.str.String = char(9731); % Neutral cue (Gray Circle)
                     self.fig.str.FontName = 'Arial Unicode MS';
-                    self.fig.str.Color = 'blue';
+                    self.fig.str.Color = 'magenta';
                 else
                     self.daq.NS.sendCommand(3);
                     self.fig.str.String = char(9836); % Loss cue (Red Circle)
                     self.fig.str.FontName = 'Arial Unicode MS';
-                    self.fig.str.Color = 'magenta';
+                    self.fig.str.Color = 'yellow';
                 end
             elseif self.data.count == self.state.fixation
                 self.daq.NS.sendCommand(1);
@@ -177,14 +176,18 @@ classdef LSL_DAQ_MID < LSL_data
                 % Display square symbol (target stimulus)
                 self.fig.str.String = '■';
                 if trial_type == 1
-                    self.fig.str.Color = 'yellow';
-                elseif trial_type == 2
                     self.fig.str.Color = 'blue';
-                else
+                elseif trial_type == 2
                     self.fig.str.Color = 'magenta';
+                else
+                    self.fig.str.Color = 'yellow';
                 end
-            elseif self.data.count == response_window_start + 3
+            elseif self.data.count == response_window_start + 1
                 self.fig.str.String = '';
+            elseif self.data.count > response_window_start + 1 && self.data.count < response_window_start + 7
+                if any(self.data_daq(:, 4) > 1)
+                    self.detected_response = true; % Mark response detected
+                end
             elseif self.data.count == self.state.feedback
                 % Feedback based on response
                 if trial_type == 1  % Reward trial
@@ -194,17 +197,17 @@ classdef LSL_DAQ_MID < LSL_data
                         self.fig.str.Color = 'green';
                     else
                         self.daq.NS.sendCommand(1);
-                        self.fig.str.String = 'No reward.';
+                        self.fig.str.String = 'No reward';
                         self.fig.str.Color = 'red';
                     end
                 elseif trial_type == 2  % Neutral trial
                     if self.detected_response == true
                         self.daq.NS.sendCommand(4);
-                        self.fig.str.String = 'No change - good response!';
+                        self.fig.str.String = 'good response +-0';
                         self.fig.str.Color = 'green';
                     else
                         self.daq.NS.sendCommand(1);
-                        self.fig.str.String = 'No change - bad response!';
+                        self.fig.str.String = 'bad response +-0';
                         self.fig.str.Color = 'red';
                     end
                 else  % Loss trial

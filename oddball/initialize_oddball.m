@@ -9,7 +9,8 @@ sec = 2;
 COI = 1:128;
 
 %% initialize EGI
-LD = LSL_DAQ_oddball(Fs,sec,COI, 3, 50);
+% LD = LSL_DAQ_oddball(Fs,sec,COI, 3, 10);
+LD = LSL_DAQ_oddball(Fs,sec,COI, 4, 50);
 LD = LD.set_buffer;
 
 user_data.LSL_DAQ_oddball = LD;

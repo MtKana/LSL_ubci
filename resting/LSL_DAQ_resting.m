@@ -23,20 +23,19 @@ classdef LSL_DAQ_resting < LSL_data
             self.data.count  = 0;
             self.data.running = 0;
             
+            self.state.relax   = 0;      % relax (5 sec)
+            self.state.close_1 = 50;    % close (60 sec)
+            self.state.open_1  = 650;   % open  (60 sec)
+            self.state.close_2 = 1250;  % close (60 sec)
+            self.state.open_2  = 1850;  % open  (60 sec)
+            self.state.end     = 2450;  % end of one loop
 
-%             self.state.relax   = 0;      % relax (5 sec)
-%             self.state.close_1 = 50;    % close (60 sec)
-%             self.state.open_1  = 650;   % open  (60 sec)
-%             self.state.close_2 = 1250;  % close (60 sec)
-%             self.state.open_2  = 1850;  % open  (60 sec)
-%             self.state.end     = 2450;  % end of one loop
-
-            self.state.relax   = 1;      % relax (5 sec)
-            self.state.close_1 = 50;    % close (5 sec)
-            self.state.open_1  = 100;   % open  (5 sec)
-            self.state.close_2 = 150;  % close (5 sec)
-            self.state.open_2  = 200;  % open  (5 sec)
-            self.state.end     = 250;  % end of one loop
+%             self.state.relax   = 1;      % relax (5 sec)
+%             self.state.close_1 = 50;    % close (5 sec)
+%             self.state.open_1  = 100;   % open  (5 sec)
+%             self.state.close_2 = 150;  % close (5 sec)
+%             self.state.open_2  = 200;  % open  (5 sec)
+%             self.state.end     = 250;  % end of one loop
             
             %% Figure settings
             self.fig.str = 0;

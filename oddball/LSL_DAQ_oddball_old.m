@@ -1,4 +1,4 @@
-classdef LSL_DAQ_stroop < LSL_data
+classdef LSL_DAQ_oddball < LSL_data
     properties (Access = public)
         state  = struct;
         data   = struct;
@@ -12,10 +12,13 @@ classdef LSL_DAQ_stroop < LSL_data
         current_trial
         trial_sequence
         trial_types
+        detected_response % Track user response
+        data_daq % Store DAQ data
     end
     
     methods (Access = public)
-        function self = LSL_DAQ_stroop(Fs, sec, COI, block_n, trial_n)
+        function self = LSL_DAQ_oddball(Fs, sec, COI, block_n, trial_n)
+            dbstop if error;
             self@LSL_data(Fs, sec, COI);
             
             %% Set parameters
@@ -23,24 +26,26 @@ classdef LSL_DAQ_stroop < LSL_data
             self.trial_n = trial_n;
             self.current_block = 1;
             self.current_trial = 1;
+            self.detected_response = false; % Initialize response tracker
+            self.data_daq = []; % Initialize DAQ data
 
             %% State settings (values in number of calls, since time_keeper is called every 0.1s)
-            self.state.ready = 1;      % Ready period (300 ms)
-            self.state.fixation = 4;  % Fixation cross (300 ms)
-            self.state.target = 7;    % Target stimulus (1000 ms)
-            self.state.response = 17;  % Response period (1000 ms)
-            self.state.blank = 27;     % Blank period (500 ms)
-            self.state.end = 32;
+            self.state.ready = 1;      % Ready period (1500 ms)
+            self.state.fixation = 16;  % Fixation cross (1000 ms)
+            self.state.target = 26;    % Target stimulus (300 ms)
+            self.state.response = 29;  % Response period (1000 ms)
+            self.state.end = 39;
             self.data.count = 0;
             self.data.running = 0;
             self.state.udp     = 0;
             self.state.trigger = 0;
 
-            %% Generate balanced trial types (1: Congruent, 2: Incongruent, 3: Neutral)
-            n_each = floor(trial_n / 3);
-            self.trial_types = [ones(1, n_each), 2*ones(1, n_each), 3*ones(1, n_each)];
-            self.trial_types = self.trial_types(randperm(length(self.trial_types))); % Shuffle trials            
-           
+            %% Generate balanced trial types for Oddball Task (Standard ~75%, Target ~25%)
+            n_standard = round(trial_n * 0.75);
+            n_target = trial_n - n_standard; % Remaining trials for target         
+            self.trial_types = [ones(1, n_standard), 2*ones(1, n_target)];
+            self.trial_types = self.trial_types(randperm(length(self.trial_types))); % Shuffle trials
+
             %% Figure settings
             self.fig.str = 0;
             
@@ -53,11 +58,11 @@ classdef LSL_DAQ_stroop < LSL_data
             self.udpR = ReceiverUDP();
             self.udpR.set_config(5500, "127.0.0.5", 0.05);
             self.udpR.start();
-
-        end           
+        end   
 
         function self = setup_protocol(self)
-            self.fp = figure('Units', 'pixels', 'Position', get(0, 'ScreenSize'), 'WindowState', 'maximized'); % Fullscreen
+            dbstop if error;
+            self.fp = figure('Units', 'pixels', 'Position', get(0, 'ScreenSize'), 'WindowState', 'maximized');
             set(self.fp, 'color', 'black', 'menu', 'none', 'toolbar', 'none');
             hold on;
             self.fig.trial_num = text(0.02, 0.98, '', 'fontsize', 50, 'fontname', 'Arial', 'color', 'white', 'HorizontalAlignment', 'left', 'Units', 'normalized');
@@ -66,11 +71,12 @@ classdef LSL_DAQ_stroop < LSL_data
         end
 
         function self = time_keeper(self)
+            dbstop if error;
             if self.state.trigger == 1 && self.data.running == 1
                 self.data.count = self.data.count + 1;
                 if self.data.count == self.state.end
                     self.data.count = 0;
-                    if self.current_trial < self.trial_n
+                    if self.current_trial < self.trial_n % Prevent exceeding trial count
                         self.current_trial = self.current_trial + 1;
                     else
                         if self.current_block < self.block_n
@@ -101,9 +107,29 @@ classdef LSL_DAQ_stroop < LSL_data
             end
         end
 
+        function self = process_daq(self, daq_data)
+            dbstop if error;
+            self.data_daq = daq_data; 
+            self.fig.trial_num.String = sprintf('Block: %d | Trial: %d', self.current_block, self.current_trial);
+            drawnow;
+            
+            % Monitor DAQ data during response window
+            if self.data.count >= self.state.response && self.data.count < self.state.end
+                if any(self.data_daq(:, 4) > 1)
+                    self.detected_response = true; % Mark response detected
+                end
+            end
+        end
+
+
         function self = show_protocol(self)
-            self.fig.trial_num.String = sprintf('Trial %d', self.current_trial);
+            dbstop if error;
+            if self.current_trial > length(self.trial_types)
+                return; % Prevent out-of-bounds error
+            end
+
             trial_type = self.trial_types(self.current_trial);
+            
             if self.data.count == 0
                 if self.current_trial >= self.trial_n && self.current_block > self.block_n
                     self.fig.str.String = 'Experiment end';
@@ -122,25 +148,28 @@ classdef LSL_DAQ_stroop < LSL_data
                 self.fig.str.String = '+';
                 self.fig.str.Color = 'white';
             elseif self.data.count == self.state.target
-                self.daq.NS.sendCommand(1);
-                if trial_type == 1  % Congruent Stimulus
-                    self.fig.str.String = 'Red';
-                    self.fig.str.Color = 'red';
-                elseif trial_type == 2  % Incongruent Stimulus
-                    self.fig.str.String = 'Blue';
+             
+                if trial_type == 1  % Standard (Frequent) Stimulus
+                    self.daq.NS.sendCommand(2);
+                    self.fig.str.String = char(9816);
+                    self.fig.str.FontName = 'Arial Unicode MS';
+                    self.fig.str.Color = 'blue';
+                elseif trial_type == 2  % Target (Rare) Stimulus
+                    self.daq.NS.sendCommand(3);
+                    self.fig.str.String = char(9836);
+                    self.fig.str.FontName = 'Arial Unicode MS';
                     self.fig.str.Color = 'yellow';
-                elseif trial_type == 3  % Neutral stimulus
-                    self.fig.str.String = 'Forest'; 
-                    self.fig.str.Color = 'green';
                 end
             elseif self.data.count == self.state.response
                 self.daq.NS.sendCommand(1);
                 self.fig.str.String = '';
-            elseif self.data.count == self.state.blank
-                self.daq.NS.sendCommand(1);
-                self.fig.str.String = '';
             elseif self.data.count == self.state.end
-                self.daq.NS.sendCommand(1);
+                % Determine DAQ command based on user response and trial type
+                if (trial_type == 2 && self.detected_response) || (trial_type == 1 && ~self.detected_response)
+                    self.daq.NS.sendCommand(4);
+                elseif (trial_type == 2 && ~self.detected_response) || (trial_type == 1 && self.detected_response)
+                    self.daq.NS.sendCommand(1);
+                end
                 self.fig.str.String = '';
             end
         end

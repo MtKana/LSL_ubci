@@ -9,7 +9,8 @@ sec = 2;
 COI = 1:128;
 
 %% initialize EGI
-LD = LSL_DAQ_goNoGo(Fs,sec,COI, 3, 4, 0.7);
+% LD = LSL_DAQ_goNoGo(Fs,sec,COI, 3, 10, 0.7);
+LD = LSL_DAQ_goNoGo(Fs,sec,COI, 4, 50, 0.7);
 LD = LD.set_buffer;
 
 user_data.LSL_DAQ_goNoGo = LD;

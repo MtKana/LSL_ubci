@@ -32,11 +32,11 @@ classdef LSL_DAQ_goNoGo < LSL_data
             self.detected_response = false; % Flag for DAQ > 2 detection
 
             %% State settings
-            self.state.rest   = 1;   
-            self.state.fixation = 11; 
-            self.state.stimulus = 21; 
-            self.state.response = 24; 
-            self.state.feedback = 34; 
+            self.state.rest   = 1;    % Rest (1 sec)
+            self.state.fixation = 11; % Fixation (1 sec)
+            self.state.stimulus = 21; % Stimuls presentation (300ms)
+            self.state.response = 24; % Response window (1 sec)
+            self.state.feedback = 34; % Feedback presentation (1 sec)
             self.state.end = 44;
             self.data.count = 0;
             self.data.running = 0;
@@ -117,7 +117,7 @@ classdef LSL_DAQ_goNoGo < LSL_data
             
             % Monitor DAQ data during response window
             if self.data.count >= self.state.response && self.data.count < self.state.feedback
-                if any(self.data_daq(:, 4) > 1.5)
+                if any(self.data_daq(:, 4) > 1)
                     self.detected_response = true; % Mark response detected
                 end
             end
@@ -158,7 +158,7 @@ classdef LSL_DAQ_goNoGo < LSL_data
                         self.daq.NS.sendCommand(3); % DAQ command for No-Go trial
                         self.fig.str.String = char(9836);
                         self.fig.str.FontName = 'Arial Unicode MS';
-                        self.fig.str.Color = 'red';
+                        self.fig.str.Color = 'red'; 
                     end
                 end
             elseif self.data.count == self.state.response
