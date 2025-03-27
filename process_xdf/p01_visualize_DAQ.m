@@ -1,8 +1,6 @@
 function visualize_DAQ()
     order_index = 3;
-
     duration = 540;
-
 
     % Check if 'data_xdf' exists in the workspace
     if ~evalin('base', 'exist(''data_xdf'', ''var'')')
