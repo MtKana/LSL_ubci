@@ -1,6 +1,6 @@
 function visualize_DAQ()
     order_index = 3;
-    duration = 3600;
+    duration = 540;
 
     % Check if 'data_xdf' exists in the workspace
     if ~evalin('base', 'exist(''data_xdf'', ''var'')')
@@ -26,7 +26,7 @@ function visualize_DAQ()
     [num_channels, num_samples] = size(time_series);
 
     % Sampling frequency (Hz)
-    Fs = 1000;
+    Fs = 10000;
 
     % Number of samples to display
     max_samples = Fs * duration;

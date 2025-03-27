@@ -1,6 +1,6 @@
 %% readxdf
 clearvars
-file_xdf = dir('JIN_rest_2.xdf');
+file_xdf = dir('data/JIN_rest_2.xdf');
 
 file_xdf = fullfile(file_xdf(end).folder,file_xdf.name);
 data_xdf = load_xdf(file_xdf);
